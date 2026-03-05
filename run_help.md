@@ -1,0 +1,1 @@
+use `py` cmd to run python
