@@ -10,7 +10,6 @@ from single_gen import create_tab as single_tab
 from batch_gen import create_tab as batch_tab
 from phasepaint_gen import create_tab as phasepaint_tab
 
-
 def main():
     with gr.Blocks() as demo:
         with gr.Tabs():

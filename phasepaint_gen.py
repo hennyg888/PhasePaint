@@ -1,9 +1,42 @@
 import gradio as gr
 import torch
+from PIL import ImageDraw
 
 from single_gen import get_pipe
-from utils import preview_imgs, decode_imgs, display_image
+from utils import preview_imgs, decode_imgs
 
+def draw_border(img):
+    img = img.copy()
+    draw = ImageDraw.Draw(img)
+    w, h = img.size
+    thickness = 10
+    for i in range(thickness):
+        draw.rectangle([i, i, w-i-1, h-i-1], outline="red")
+    return img
+
+def toggle_select(evt: gr.SelectData, state):
+    selected = state["selected"]
+    if selected is None:
+        selected = []
+
+    idx = evt.index
+
+    if idx in selected:
+        selected.remove(idx)
+    else:
+        selected.append(idx)
+    state["selected"] = selected
+
+    # rebuild gallery with class applied
+    gallery_items = []
+    images = state["previews"]
+    for i, img in enumerate(images):
+        if i in selected:
+            gallery_items.append(draw_border(img))
+        else:
+            gallery_items.append(img)
+    gallery = gr.Gallery(value=gallery_items, selected_index=None)
+    return gallery, state
 
 def create_tab():
     """PhasePaint-specific generation interface.
@@ -23,13 +56,20 @@ def create_tab():
     status_slider = gr.Slider(minimum=0, maximum=STEPS, value=0, step=1, label="Iterations completed", interactive=False)
     out_gallery = gr.Gallery(label="Results (3x3)", rows=3, columns=3, type="pil", allow_preview=False)
     
-    # persistent state between clicks
     state = gr.State({
         "latents": None,
         "prompt_embeds": None,
         "current": None,
         "guidance": None,
+        "selected": [],
+        "previews": None,
     })
+
+    out_gallery.select(
+        toggle_select,
+        inputs=state,
+        outputs=[out_gallery, state]
+    )
 
     @torch.no_grad()
     def _step(prompt: str, negative_prompt: str, state: dict):
@@ -72,7 +112,7 @@ def create_tab():
                 "latents": latents,
                 "prompt_embeds": prompt_embeds,
                 "current": START_STEP,
-                "guidance": guidance,
+                "guidance": guidance
             })
 
         # perform one chunk of STEP_INTERVAL steps
@@ -95,7 +135,9 @@ def create_tab():
         state["current"] = current
 
         previews = preview_imgs(latents)
-        display_image(previews[0], title=f"PhasePaint preview at {current} steps")
+        state["previews"] = previews
+        state["selected"] = []  # reset selection on new preview
+        #display_image(previews[0], title=f"PhasePaint preview at {current} steps")
 
         if current >= STEPS:
             # finished, return final batch and clear state
