@@ -18,23 +18,21 @@ def get_pipe() -> LatentRefinerPipeline:
     return _GLOBAL_PIPE
 
 
-def create_tab():
+def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox):
     """Builds the components for the "single gen" tab.
 
-    This function is intended to be called from an outer
-    `gr.Blocks` context (for example, within a `TabItem`).
-    It exposes a prompt/negative-prompt interface and drives a
-    diffusion pipeline based on :class:`LatentRefinerPipeline`.
+    The prompt textboxes are supplied by the caller so they can be
+    shared across tabs.  Callers should create the boxes once and
+    pass them in.
     """
 
     gr.Markdown("### Single Generation")
 
-    prompt_txt = gr.Textbox(label="Prompt", placeholder="Enter a prompt...")
-    neg_txt = gr.Textbox(label="Negative prompt", placeholder="Things to avoid")
-
+    with gr.Row():
+        generate_btn = gr.Button("Generate")
+        cancel_btn = gr.Button("Cancel")
     out_img = gr.Image(type="pil", label="Result")
-    generate_btn = gr.Button("Generate")
-    cancel_btn = gr.Button("Cancel")
+
 
     # simple mutable flag for cancellation
     cancel_requested = {"flag": False}
@@ -102,7 +100,7 @@ def create_tab():
             if (i + 1) % preview_interval == 0 or i == len(timesteps) - 1:
                 preview = preview_imgs(latents)[0]
                 #display_image(preview, title=f"Preview step {i+1}/{STEPS}")
-                print(f"Yielding preview at step {i+1}/{STEPS}")
+                #print(f"Yielding preview at step {i+1}/{STEPS}")
                 yield preview
 
         # final decode

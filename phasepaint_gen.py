@@ -6,12 +6,15 @@ from single_gen import get_pipe
 from utils import preview_imgs, decode_imgs
 
 def draw_border(img):
+    # draw a solid red 'X' over the image instead of a border
     img = img.copy()
     draw = ImageDraw.Draw(img)
     w, h = img.size
-    thickness = 10
-    for i in range(thickness):
-        draw.rectangle([i, i, w-i-1, h-i-1], outline="red")
+    line_width = max(1, min(w, h) // 20)
+    # diagonal from top-left to bottom-right
+    draw.line((0, 0, w, h), fill="red", width=line_width)
+    # diagonal from top-right to bottom-left
+    draw.line((w, 0, 0, h), fill="red", width=line_width)
     return img
 
 def toggle_select(evt: gr.SelectData, state):
@@ -38,20 +41,20 @@ def toggle_select(evt: gr.SelectData, state):
     gallery = gr.Gallery(value=gallery_items, selected_index=None)
     return gallery, state
 
-def create_tab():
+def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox):
     """PhasePaint-specific generation interface.
 
     Uses the same `LatentRefinerPipeline` but runs it repeatedly
     from a random latent, emitting preview images every
-    `STEP_INTERVAL` steps.
+    `STEP_INTERVAL` steps.  The prompt textboxes are shared across
+    tabs, so the user sees the same content no matter where they
+    type.
     """
 
     gr.Markdown("### PhasePaint Generation")
 
     from config import STEPS, GUIDANCE_SCALE, STEP_INTERVAL, START_STEP, GALLERY_SIZE
 
-    prompt_txt = gr.Textbox(label="Prompt", placeholder="Description of scene")
-    neg_txt = gr.Textbox(label="Negative prompt", placeholder="Things to avoid")
     go_btn = gr.Button("Generate/Continue")
     status_slider = gr.Slider(minimum=0, maximum=STEPS, value=0, step=1, label="Iterations completed", interactive=False)
     out_gallery = gr.Gallery(label="Results (3x3)", rows=3, columns=3, type="pil", allow_preview=False, height=GALLERY_SIZE, elem_id="my_gallery")   

@@ -19,13 +19,19 @@ css = f"""
 
 def main():
     with gr.Blocks(css=css) as demo:
+        # create shared prompt/negative-prompt components that live
+        # outside individual tabs; typing in one tab will update the
+        # others automatically since they refer to the same component
+        prompt_txt = gr.Textbox(label="Prompt", placeholder="Description of scene")
+        neg_txt = gr.Textbox(label="Negative prompt", placeholder="Things to avoid")
+
         with gr.Tabs():
             with gr.TabItem("single gen"):
-                single_tab()
+                single_tab(prompt_txt, neg_txt)
             with gr.TabItem("batch gen"):
-                batch_tab()
+                batch_tab(prompt_txt, neg_txt)
             with gr.TabItem("PhasePaint gen"):
-                phasepaint_tab()
+                phasepaint_tab(prompt_txt, neg_txt)
 
     demo.launch()
 

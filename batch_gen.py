@@ -7,12 +7,14 @@ from utils import decode_imgs
 
 
 
-def create_tab():
-    """Batch‑generation interface producing a 3x3 grid of outputs."""
+def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox):
+    """Batch‑generation interface producing a 3x3 grid of outputs.
+
+    The `prompt_txt` and `neg_txt` components are shared across all
+    tabs so that changing the text in one tab reflects everywhere.
+    """
 
     gr.Markdown("### Batch Generation")
-    prompt_txt = gr.Textbox(label="Prompt")
-    neg_txt = gr.Textbox(label="Negative prompt")
     run_btn = gr.Button("Generate Batch")
     out_gallery = gr.Gallery(label="Results (3x3)", rows=3, columns=3, type="pil", allow_preview=False, height=GALLERY_SIZE, elem_id="my_gallery")
 
