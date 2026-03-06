@@ -48,13 +48,13 @@ def create_tab():
 
     gr.Markdown("### PhasePaint Generation")
 
-    from config import STEPS, GUIDANCE_SCALE, STEP_INTERVAL, START_STEP
+    from config import STEPS, GUIDANCE_SCALE, STEP_INTERVAL, START_STEP, GALLERY_SIZE
 
     prompt_txt = gr.Textbox(label="Prompt", placeholder="Description of scene")
     neg_txt = gr.Textbox(label="Negative prompt", placeholder="Things to avoid")
     go_btn = gr.Button("Generate/Continue")
     status_slider = gr.Slider(minimum=0, maximum=STEPS, value=0, step=1, label="Iterations completed", interactive=False)
-    out_gallery = gr.Gallery(label="Results (3x3)", rows=3, columns=3, type="pil", allow_preview=False)
+    out_gallery = gr.Gallery(label="Results (3x3)", rows=3, columns=3, type="pil", allow_preview=False, height=GALLERY_SIZE, elem_id="my_gallery")   
     
     state = gr.State({
         "latents": None,
@@ -121,22 +121,51 @@ def create_tab():
         guidance = state["guidance"]
         current = state["current"]
 
-        # run the pipeline from current for another interval
+        # if the user selected any images, expunge them completely from
+        # the optimization batch.  this means dropping their latents and
+        # associated prompt embeddings so subsequent steps only act on
+        # the remaining entries.
+        selected = state.get("selected", []) or []
+        if selected:
+            batch_size = latents.shape[0]
+            keep = [i for i in range(batch_size) if i not in selected]
+            # filter latents
+            latents = latents[keep]
+            # prompt_embeds is neg then pos concatenated; each half has
+            # batch_size entries. we keep the corresponding slices.
+            neg_embeds = prompt_embeds[:batch_size][keep]
+            pos_embeds = prompt_embeds[batch_size:][keep]
+            prompt_embeds = torch.cat([neg_embeds, pos_embeds], dim=0)
+            # also clear selection so we don't try to remove again
+            state["selected"] = []
+
+        # if nothing left to process, we're effectively done
+        if latents.numel() == 0:
+            # nothing to denoise; build an empty output and clear state
+            state.update({"latents": None, "prompt_embeds": None,
+                          "current": None, "guidance": None})
+            return [], state, str(current)
+
+        # run the pipeline from current for another interval; lists size
+        # should match the current batch
+        n = latents.shape[0]
         latents = pipe(
             latents=latents,
             prompt_embeds=prompt_embeds,
-            start_steps_list=[current] * 9,
-            num_inference_steps=[STEPS] * 9,
+            start_steps_list=[current] * n,
+            num_inference_steps=[STEPS] * n,
             guidance_scale=guidance,
             phase_len=STEP_INTERVAL,
         )
+
         current += STEP_INTERVAL
         state["latents"] = latents
+        state["prompt_embeds"] = prompt_embeds
         state["current"] = current
 
         previews = preview_imgs(latents)
         state["previews"] = previews
-        state["selected"] = []  # reset selection on new preview
+        # any residual selection should already be cleared above
         #display_image(previews[0], title=f"PhasePaint preview at {current} steps")
 
         if current >= STEPS:

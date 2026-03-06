@@ -2,7 +2,7 @@ import gradio as gr
 import torch
 
 from single_gen import get_pipe
-from config import STEPS, GUIDANCE_SCALE
+from config import STEPS, GUIDANCE_SCALE, GALLERY_SIZE
 from utils import decode_imgs
 
 
@@ -14,7 +14,7 @@ def create_tab():
     prompt_txt = gr.Textbox(label="Prompt")
     neg_txt = gr.Textbox(label="Negative prompt")
     run_btn = gr.Button("Generate Batch")
-    out_gallery = gr.Gallery(label="Results (3x3)", rows=3, columns=3, type="pil", allow_preview=False)
+    out_gallery = gr.Gallery(label="Results (3x3)", rows=3, columns=3, type="pil", allow_preview=False, height=GALLERY_SIZE, elem_id="my_gallery")
 
     # callback fired when user clicks an image in the gallery
     def _clicked(evt: gr.SelectData):

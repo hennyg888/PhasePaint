@@ -9,9 +9,16 @@ import gradio as gr
 from single_gen import create_tab as single_tab
 from batch_gen import create_tab as batch_tab
 from phasepaint_gen import create_tab as phasepaint_tab
+from config import GALLERY_SIZE
+
+css = f"""
+#my_gallery {{
+    width: {GALLERY_SIZE}px !important;
+}}
+"""
 
 def main():
-    with gr.Blocks() as demo:
+    with gr.Blocks(css=css) as demo:
         with gr.Tabs():
             with gr.TabItem("single gen"):
                 single_tab()
