@@ -3,7 +3,8 @@ import torch
 from PIL import ImageDraw
 
 from single_gen import get_pipe
-from utils import preview_imgs, decode_imgs
+from utils import preview_imgs, decode_imgs, write_image
+from logger import log
 
 def draw_cross(img):
     # draw a solid red 'X' over the image instead of a border
@@ -18,6 +19,7 @@ def draw_cross(img):
     return img
 
 def toggle_select(evt: gr.SelectData, state):
+    log("[PhasePaint] gallery image selected")
     selected = state["selected"]
     if selected is None:
         selected = []
@@ -76,6 +78,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
 
     @torch.no_grad()
     def _step(prompt: str, negative_prompt: str, state: dict):
+        log("[PhasePaint] Generate/Continue button clicked")
         device = "cuda" if torch.cuda.is_available() else "cpu"
         pipe = get_pipe()
 
@@ -124,12 +127,22 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         guidance = state["guidance"]
         current = state["current"]
 
-        # if the user selected any images, expunge them completely from
-        # the optimization batch.  this means dropping their latents and
-        # associated prompt embeddings so subsequent steps only act on
-        # the remaining entries.
+        # if the user selected any images, save the discarded previews
+        # and then expunge them completely from the optimization batch.
+        # this means dropping their latents and associated prompt
+        # embeddings so subsequent steps only act on the remaining entries.
         selected = state.get("selected", []) or []
         if selected:
+            # save preview versions of any selected images before they are
+            # removed. fall back to decoding if previews arent available.
+            previews = state.get("previews")
+            if previews is None:
+                decoded = decode_imgs(latents)
+                previews = decoded
+            for idx in selected:
+                write_image(previews[idx], "phasepaint_gen", tag="discarded", idx=idx)
+
+
             batch_size = latents.shape[0]
             keep = [i for i in range(batch_size) if i not in selected]
             # filter latents
@@ -172,8 +185,11 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         #display_image(previews[0], title=f"PhasePaint preview at {current} steps")
 
         if current >= STEPS:
-            # finished, return final batch and clear state
+            # finished, decode and save all remaining images as "saved".
             final = decode_imgs(latents)
+            for idx, img in enumerate(final):
+                write_image(img, "phasepaint_gen", tag="saved", idx=idx)
+
             state.update({"latents": None, "prompt_embeds": None, "current": None, "guidance": None})
             return final, state, str(current)
         else:
