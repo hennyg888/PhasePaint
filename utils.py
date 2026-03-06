@@ -1,4 +1,6 @@
 import torch
+import os
+from datetime import datetime
 
 import matplotlib.pyplot as plt
 def display_image(image, title="Generated Image"):
@@ -14,6 +16,41 @@ def display_image(image, title="Generated Image"):
     plt.axis("off")
     plt.title(title)
     plt.show()
+
+
+def write_image(img, gen_type: str, tag: str | None = None, user: str | None = None, idx: int | None = None):
+    """Save an image file with a standardized filename.
+
+    The generated filename includes the user identifier, the generation
+    type (e.g. ``single_gen`` or ``batch_gen``), an optional tag, and a
+    timestamp. This helper centralizes the logic so both single and batch
+    modules can reuse it.
+
+    Args:
+        img (PIL.Image): Image to save.
+        gen_type (str): Short descriptor of where the image originated.
+        tag (str|None): Optional extra descriptor ("saved", "cancelled",
+            etc.).
+        user (str|None): Username to include; if None the value from
+            :mod:`config` is used.
+        idx (int|None): Optional index to include in the filename.
+
+    Returns:
+        str: Path where the image was written.
+    """
+    if user is None:
+        from config import USER
+        user = USER
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    tag_part = f"_{tag}" if tag else ""
+    idx_part = f"_{idx}" if idx is not None else ""
+    fname = f"{user}_{gen_type}{tag_part}{idx_part}_{ts}.png"
+    os.makedirs("saved_imgs", exist_ok=True)
+    path = os.path.join("saved_imgs", fname)
+    img.save(path)
+    print(f"image saved to {path}")
+    return path
 
 from diffusers import AutoencoderKL, AutoencoderTiny 
 from diffusers.image_processor import VaeImageProcessor

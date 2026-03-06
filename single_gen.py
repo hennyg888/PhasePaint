@@ -1,8 +1,12 @@
 import gradio as gr
 import torch
+from datetime import datetime
+import os
+
+from logger import log
 
 from refiner_pipe import LatentRefinerPipeline
-from utils import preview_imgs, decode_imgs
+from utils import preview_imgs, decode_imgs, write_image
 
 # create pipeline once and reuse; pipelines are heavy to instantiate
 _GLOBAL_PIPE: LatentRefinerPipeline | None = None
@@ -32,24 +36,43 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         generate_btn = gr.Button("Generate")
         cancel_btn = gr.Button("Cancel")
     out_img = gr.Image(type="pil", label="Result")
+    save_btn = gr.Button("Save Image")
 
 
     # simple mutable flag for cancellation
     cancel_requested = {"flag": False}
 
+    # store the last successfully completed image (None if none or cancelled)
+    last_image = {"img": None}
+    # track most recent preview (for cancelled save)
+    last_preview = {"img": None}
+
     def _request_cancel():
+        # mark for cancellation and save last preview if available
+        log("[single_gen] cancel button pressed")
         cancel_requested["flag"] = True
+        img = last_preview.get("img")
+        if img is not None and last_image.get("img") is None:
+            write_image(img, "single_gen", tag="cancelled")
 
     cancel_btn.click(_request_cancel)
 
     # generator function will yield intermediate previews
     # import the fixed parameters lazily to avoid circular import issues
-    from config import STEPS, GUIDANCE_SCALE, PREVIEW_INTERVAL
+    from config import STEPS, GUIDANCE_SCALE, PREVIEW_INTERVAL, USER
 
     @torch.no_grad()
     def _generate(prompt: str, negative_prompt: str):
+        # log generate action
+        log("[single_gen] generate button pressed")
+        # if there was a previous completed image that wasn't saved, mark it discarded
+        if last_image.get("img") is not None and not cancel_requested.get("flag"):
+            write_image(last_image["img"], "single_gen", tag="discarded")
         # reset flag every time we start
         cancel_requested["flag"] = False
+        # clear last image – new generation in progress
+        last_image["img"] = None
+        last_preview["img"] = None
         # build pipeline & embeddings (reusing global instance)
         device = "cuda" if torch.cuda.is_available() else "cpu"
         pipe = get_pipe()
@@ -99,6 +122,8 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
             # every so often show a preview
             if (i + 1) % preview_interval == 0 or i == len(timesteps) - 1:
                 preview = preview_imgs(latents)[0]
+                # keep for potential cancel save
+                last_preview["img"] = preview
                 #display_image(preview, title=f"Preview step {i+1}/{STEPS}")
                 #print(f"Yielding preview at step {i+1}/{STEPS}")
                 yield preview
@@ -107,7 +132,23 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         final = decode_imgs(latents)[0]
         # make sure flag cleared
         cancel_requested["flag"] = False
+        # save completed image into state in case user wants to save it
+        last_image["img"] = final
         yield final
+
+    # hook up save button (no outputs needed)
+    def _save_image():
+        # only save if a final image exists and we are not in cancelled state
+        if cancel_requested.get("flag"):
+            return
+        img = last_image.get("img")
+        if img is None:
+            return
+        log("[single_gen] save button pressed")
+        last_image["img"] = None
+        return write_image(img, "single_gen", tag="saved")
+
+    save_btn.click(_save_image)
 
     # use a queued function so that events run sequentially
     generate_btn.click(

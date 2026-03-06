@@ -5,7 +5,7 @@ from PIL import ImageDraw
 from single_gen import get_pipe
 from utils import preview_imgs, decode_imgs
 
-def draw_border(img):
+def draw_cross(img):
     # draw a solid red 'X' over the image instead of a border
     img = img.copy()
     draw = ImageDraw.Draw(img)
@@ -35,7 +35,7 @@ def toggle_select(evt: gr.SelectData, state):
     images = state["previews"]
     for i, img in enumerate(images):
         if i in selected:
-            gallery_items.append(draw_border(img))
+            gallery_items.append(draw_cross(img))
         else:
             gallery_items.append(img)
     gallery = gr.Gallery(value=gallery_items, selected_index=None)
