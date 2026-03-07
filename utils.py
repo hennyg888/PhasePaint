@@ -45,9 +45,9 @@ def write_image(img, gen_type: str, tag: str | None = None, user: str | None = N
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     tag_part = f"_{tag}" if tag else ""
     idx_part = f"_{idx}" if idx is not None else ""
-    fname = f"{user}_{gen_type}{tag_part}{idx_part}_{ts}.png"
-    os.makedirs("saved_imgs", exist_ok=True)
-    path = os.path.join("saved_imgs", fname)
+    fname = f"{user}_{ts}_{gen_type}{tag_part}{idx_part}.png"
+    os.makedirs(f"saved_imgs/{user}", exist_ok=True)
+    path = os.path.join("saved_imgs", user, fname)
     img.save(path)
     print(f"image saved to {path}")
     return path

@@ -73,9 +73,9 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         # reset state after write
         state["selected"] = []
         state["images"] = []
-        return state
+        return [], state, gr.Button(interactive=True)
 
-    save_btn.click(_save_images, inputs=state, outputs=state)
+    save_btn.click(_save_images, inputs=state, outputs=[out_gallery, state, run_btn])
 
 
     @torch.no_grad()
@@ -120,6 +120,6 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         # store previews in state so selection can highlight
         if state is not None:
             state["images"] = imgs
-        return imgs, state
+        return imgs, state, gr.Button(interactive=False)
 
-    run_btn.click(_batch, inputs=[prompt_txt, neg_txt, state], outputs=[out_gallery, state])
+    run_btn.click(_batch, inputs=[prompt_txt, neg_txt, state], outputs=[out_gallery, state, run_btn])

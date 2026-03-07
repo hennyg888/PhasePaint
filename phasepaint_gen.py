@@ -19,7 +19,7 @@ def draw_cross(img):
     return img
 
 def toggle_select(evt: gr.SelectData, state):
-    log("[PhasePaint] gallery image selected")
+    log("[PhasePaint_gen] gallery image selected")
     selected = state["selected"]
     if selected is None:
         selected = []
@@ -60,7 +60,8 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
     go_btn = gr.Button("Generate/Continue")
     status_slider = gr.Slider(minimum=0, maximum=STEPS, value=0, step=1, label="Iterations completed", interactive=False)
     out_gallery = gr.Gallery(label="Results (3x3)", rows=3, columns=3, type="pil", allow_preview=False, height=GALLERY_SIZE, elem_id="my_gallery")   
-    
+    save_btn = gr.Button("Save Images")
+
     state = gr.State({
         "latents": None,
         "prompt_embeds": None,
@@ -70,6 +71,23 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         "previews": None,
     })
 
+    def _save_images(state: dict):
+        if state.get("current") is not None or state.get("previews") is None:
+            return state  # still generating; ignore save clicks
+        log("[PhasePaint_gen] save button clicked")
+        # save selected with 'saved' tag, others as 'discarded'
+        imgs = state.get("previews", [])
+        sel = state.get("selected", [])
+        for idx, img in enumerate(imgs):
+            tag = f"discarded_itr-{STEPS}" if idx in sel else "saved"
+            write_image(img, "PhasePaint_gen", tag=tag, idx=idx)
+        # reset state after write
+        state["selected"] = []
+        state["previews"] = []
+        return [], state, str(0), gr.Button(interactive=True)
+
+    save_btn.click(_save_images, inputs=state, outputs=[out_gallery, state, status_slider, go_btn])
+
     out_gallery.select(
         toggle_select,
         inputs=state,
@@ -78,7 +96,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
 
     @torch.no_grad()
     def _step(prompt: str, negative_prompt: str, state: dict):
-        log("[PhasePaint] Generate/Continue button clicked")
+        log("[PhasePaint_gen] Generate/Continue button clicked")
         device = "cuda" if torch.cuda.is_available() else "cpu"
         pipe = get_pipe()
 
@@ -134,13 +152,13 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         selected = state.get("selected", []) or []
         if selected:
             # save preview versions of any selected images before they are
-            # removed. fall back to decoding if previews arent available.
+            # removed. fall back to decoding if previews aren't available.
             previews = state.get("previews")
             if previews is None:
                 decoded = decode_imgs(latents)
                 previews = decoded
             for idx in selected:
-                write_image(previews[idx], "phasepaint_gen", tag="discarded", idx=idx)
+                write_image(previews[idx], "PhasePaint_gen", tag=f"discarded_itr-{current}", idx=idx)
 
 
             batch_size = latents.shape[0]
@@ -160,7 +178,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
             # nothing to denoise; build an empty output and clear state
             state.update({"latents": None, "prompt_embeds": None,
                           "current": None, "guidance": None})
-            return [], state, str(current)
+            return [], state, str(0), gr.skip()
 
         # run the pipeline from current for another interval; lists size
         # should match the current batch
@@ -179,25 +197,20 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         state["prompt_embeds"] = prompt_embeds
         state["current"] = current
 
-        previews = preview_imgs(latents)
-        state["previews"] = previews
-        # any residual selection should already be cleared above
-        #display_image(previews[0], title=f"PhasePaint preview at {current} steps")
-
         if current >= STEPS:
             # finished, decode and save all remaining images as "saved".
             final = decode_imgs(latents)
-            for idx, img in enumerate(final):
-                write_image(img, "phasepaint_gen", tag="saved", idx=idx)
-
+            state["previews"] = final
             state.update({"latents": None, "prompt_embeds": None, "current": None, "guidance": None})
-            return final, state, str(current)
+            return final, state, str(current), gr.Button(interactive=False)
         else:
-            return previews, state, str(current)
+            previews = preview_imgs(latents)
+            state["previews"] = previews
+            return previews, state, str(current), gr.skip()
 
     go_btn.click(
         _step,
         inputs=[prompt_txt, neg_txt, state],
-        outputs=[out_gallery, state, status_slider],
+        outputs=[out_gallery, state, status_slider, go_btn],
         queue=True,
     )

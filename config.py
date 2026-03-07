@@ -6,7 +6,7 @@ GUIDANCE_SCALE = 7.5  # classifier-free guidance strength
 PREVIEW_INTERVAL = 8  # how many steps between each preview
 STEP_INTERVAL = 10
 START_STEP = 10
-GALLERY_SIZE = 840
+GALLERY_SIZE = 720
 
 # user identifier used for naming the mouse-click log file
 USER = "default_user"  # override in your environment or edit directly
