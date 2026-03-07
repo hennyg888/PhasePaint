@@ -36,7 +36,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         generate_btn = gr.Button("Generate")
         cancel_btn = gr.Button("Cancel")
     out_img = gr.Image(type="pil", label="Result")
-    save_btn = gr.Button("Save Image")
+    save_btn = gr.Button("Save Image", interactive=False)
 
 
     # simple mutable flag for cancellation
@@ -50,7 +50,8 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
     def _request_cancel():
         # mark for cancellation and save last preview if available
         log("[single_gen] cancel button pressed")
-        cancel_requested["flag"] = True
+        if not cancel_requested["flag"]:
+            cancel_requested["flag"] = True
         img = last_preview.get("img")
         if img is not None and last_image.get("img") is None:
             write_image(img, "single_gen", tag="cancelled")
@@ -106,6 +107,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
             if cancel_requested["flag"]:
                 # clear flag so next run starts fresh
                 cancel_requested["flag"] = False
+                yield None, gr.skip()
                 return
 
             # two forward passes for classifier-free guidance
@@ -126,7 +128,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
                 last_preview["img"] = preview
                 #display_image(preview, title=f"Preview step {i+1}/{STEPS}")
                 #print(f"Yielding preview at step {i+1}/{STEPS}")
-                yield preview
+                yield preview, gr.skip()
 
         # final decode
         final = decode_imgs(latents)[0]
@@ -134,7 +136,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         cancel_requested["flag"] = False
         # save completed image into state in case user wants to save it
         last_image["img"] = final
-        yield final
+        yield final, gr.Button(interactive=True)
 
     # hook up save button (no outputs needed)
     def _save_image():
@@ -146,14 +148,14 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
             return
         log("[single_gen] save button pressed")
         last_image["img"] = None
-        return write_image(img, "single_gen", tag="saved")
+        write_image(img, "single_gen", tag="saved")
+        return gr.Button(interactive=False), None
 
-    save_btn.click(_save_image)
+    save_btn.click(_save_image, outputs=[save_btn, out_img])
 
     # use a queued function so that events run sequentially
     generate_btn.click(
         _generate,
         inputs=[prompt_txt, neg_txt],
-        outputs=out_img,
-        queue=True,
+        outputs=[out_img, save_btn]
     )

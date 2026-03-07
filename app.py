@@ -10,7 +10,7 @@ from logger import log
 from single_gen import create_tab as single_tab
 from batch_gen import create_tab as batch_tab
 from phasepaint_gen import create_tab as phasepaint_tab
-from config import GALLERY_SIZE
+from config import GALLERY_SIZE, SHARE
 
 css = f"""
 #my_gallery {{
@@ -46,7 +46,7 @@ def main():
             with gr.TabItem("PhasePaint gen"):
                 phasepaint_tab(prompt_txt, neg_txt)
 
-    demo.launch()
+    demo.launch(share=SHARE)
 
 
 if __name__ == "__main__":

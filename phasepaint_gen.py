@@ -60,7 +60,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
     go_btn = gr.Button("Generate/Continue")
     status_slider = gr.Slider(minimum=0, maximum=STEPS, value=0, step=1, label="Iterations completed", interactive=False)
     out_gallery = gr.Gallery(label="Results (3x3)", rows=3, columns=3, type="pil", allow_preview=False, height=GALLERY_SIZE, elem_id="my_gallery")   
-    save_btn = gr.Button("Save Images")
+    save_btn = gr.Button("Save Images", interactive=False)
 
     state = gr.State({
         "latents": None,
@@ -84,9 +84,9 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         # reset state after write
         state["selected"] = []
         state["previews"] = []
-        return [], state, str(0), gr.Button(interactive=True)
+        return [], state, str(0), gr.Button(interactive=True), gr.Button(interactive=False)
 
-    save_btn.click(_save_images, inputs=state, outputs=[out_gallery, state, status_slider, go_btn])
+    save_btn.click(_save_images, inputs=state, outputs=[out_gallery, state, status_slider, go_btn, save_btn])
 
     out_gallery.select(
         toggle_select,
@@ -202,15 +202,15 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
             final = decode_imgs(latents)
             state["previews"] = final
             state.update({"latents": None, "prompt_embeds": None, "current": None, "guidance": None})
-            return final, state, str(current), gr.Button(interactive=False)
+            return final, state, str(current), gr.Button(interactive=False), gr.Button(interactive=True)
         else:
             previews = preview_imgs(latents)
             state["previews"] = previews
-            return previews, state, str(current), gr.skip()
+            return previews, state, str(current), gr.skip(), gr.skip()
 
     go_btn.click(
         _step,
         inputs=[prompt_txt, neg_txt, state],
-        outputs=[out_gallery, state, status_slider, go_btn],
+        outputs=[out_gallery, state, status_slider, go_btn, save_btn],
         queue=True,
     )
