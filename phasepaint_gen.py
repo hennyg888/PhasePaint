@@ -58,7 +58,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
     from config import STEPS, GUIDANCE_SCALE, STEP_INTERVAL, START_STEP, GALLERY_SIZE
 
     go_btn = gr.Button("Generate/Continue")
-    status_slider = gr.Slider(minimum=0, maximum=STEPS, value=0, step=1, label="Iterations completed", interactive=False)
+    status_slider = gr.Slider(minimum=0, maximum=STEPS, value=0, step=1, label="Iterations Completed", interactive=False)
     out_gallery = gr.Gallery(label="Results (3x3)", rows=3, columns=3, type="pil", allow_preview=False, height=GALLERY_SIZE, elem_id="my_gallery")   
     save_btn = gr.Button("Save Images", interactive=False)
 

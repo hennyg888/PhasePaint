@@ -19,7 +19,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
     gr.Markdown("### Batch Generation")
     run_btn = gr.Button("Generate Batch")
     out_gallery = gr.Gallery(label="Results (3x3)", rows=3, columns=3, type="pil", allow_preview=False, height=GALLERY_SIZE, elem_id="my_gallery")
-    save_btn = gr.Button("Save Selected Images")
+    save_btn = gr.Button("Save Selected Images", interactive=False)
 
     state = gr.State({
         "images": [],  # most recent batch of decoded images
@@ -73,9 +73,9 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         # reset state after write
         state["selected"] = []
         state["images"] = []
-        return [], state, gr.Button(interactive=True)
+        return [], state, gr.Button(interactive=True), gr.Button(interactive=False)
 
-    save_btn.click(_save_images, inputs=state, outputs=[out_gallery, state, run_btn])
+    save_btn.click(_save_images, inputs=state, outputs=[out_gallery, state, run_btn, save_btn])
 
 
     @torch.no_grad()
@@ -120,6 +120,6 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         # store previews in state so selection can highlight
         if state is not None:
             state["images"] = imgs
-        return imgs, state, gr.Button(interactive=False)
+        return imgs, state, gr.Button(interactive=False), gr.Button(interactive=True)
 
-    run_btn.click(_batch, inputs=[prompt_txt, neg_txt, state], outputs=[out_gallery, state, run_btn])
+    run_btn.click(_batch, inputs=[prompt_txt, neg_txt, state], outputs=[out_gallery, state, run_btn, save_btn])
