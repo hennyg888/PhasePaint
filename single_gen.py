@@ -1,7 +1,6 @@
 import gradio as gr
 import torch
-from datetime import datetime
-import os
+import time
 
 from logger import log
 
@@ -64,6 +63,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
 
     @torch.no_grad()
     def _generate(prompt: str, negative_prompt: str):
+        #start_time = time.perf_counter()
         # log generate action
         log("[single_gen] generate button pressed")
         # if there was a previous completed image that wasn't saved, mark it discarded
@@ -136,6 +136,8 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         cancel_requested["flag"] = False
         # save completed image into state in case user wants to save it
         last_image["img"] = final
+        #end_time = time.perf_counter()
+        #print(f"Generation completed in {end_time - start_time:.2f} seconds")
         yield final, gr.Button(interactive=True)
 
     # hook up save button (no outputs needed)

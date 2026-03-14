@@ -31,7 +31,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         img = img.copy()
         draw = ImageDraw.Draw(img)
         w, h = img.size
-        thickness = 10
+        thickness = 20
         for i in range(thickness):
             draw.rectangle([i, i, w-i-1, h-i-1], outline="red")
         return img
@@ -80,6 +80,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
 
     @torch.no_grad()
     def _batch(prompt: str, negative_prompt: str, state: dict = None):
+        #start_time = time.perf_counter()
         log("[batch_gen] generate button clicked")
         device = "cuda" if torch.cuda.is_available() else "cpu"
         pipe = get_pipe()
@@ -120,6 +121,8 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         # store previews in state so selection can highlight
         if state is not None:
             state["images"] = imgs
+        #end_time = time.perf_counter()
+        #print(f"Batch generation completed in {end_time - start_time:.2f} seconds")
         return imgs, state, gr.Button(interactive=False), gr.Button(interactive=True)
 
     run_btn.click(_batch, inputs=[prompt_txt, neg_txt, state], outputs=[out_gallery, state, run_btn, save_btn])
