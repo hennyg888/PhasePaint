@@ -79,7 +79,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
 
 
     @torch.no_grad()
-    def _batch(prompt: str, negative_prompt: str, total_iterations=None, state: dict = None):
+    def _batch(prompt: str, negative_prompt: str, state: dict = None, total_iterations=50):
         #start_time = time.perf_counter()
         log("[batch_gen] generate button clicked")
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -130,8 +130,9 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         return imgs, state, gr.Button(interactive=False), gr.Button(interactive=True)
 
     inputs = [prompt_txt, neg_txt]
+    inputs.append(state)
     if total_iterations is not None:
         inputs.append(total_iterations)
-    inputs.append(state)
+    
 
     run_btn.click(_batch, inputs=inputs, outputs=[out_gallery, state, run_btn, save_btn])

@@ -188,7 +188,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
     )
 
     @torch.no_grad()
-    def _step(prompt: str, negative_prompt: str, total_iterations=None, first_phase_len_value=None, phase_count_value=None, state: dict = None):
+    def _step(prompt: str, negative_prompt: str, state: dict = None, total_iterations=50, first_phase_len_value=20, phase_count_value=4):
         log("[PhasePaint_gen] Generate/Continue button clicked")
         device = "cuda" if torch.cuda.is_available() else "cpu"
         pipe = get_pipe()
@@ -376,12 +376,12 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
             return previews, state, str(current), gr.skip(), gr.skip()
 
     inputs = [prompt_txt, neg_txt]
+    inputs.append(state)
     if total_iterations is not None:
         inputs.append(total_iterations)
     if first_phase_len is not None:
         inputs.append(first_phase_len)
         inputs.append(phase_count)
-    inputs.append(state)
 
     go_btn.click(
         _step,

@@ -8,7 +8,7 @@ STEP_INTERVAL = 10
 START_STEP = 10
 GALLERY_SIZE = 720
 SHARE = False
-NEW_FEATS = True
+NEW_FEATS = False
 
 # user identifier used for naming the mouse-click log file
 USER = "Demo"  # override in your environment or edit directly
