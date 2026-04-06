@@ -84,8 +84,55 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
     status_slider = gr.Slider(minimum=0, maximum=STEPS, value=0, step=1, label="Iterations Completed", interactive=False)
 
     duplicate_mode = None
+    first_phase_len = None
+    phase_count = None
     if NEW_FEATS:
-        duplicate_mode = gr.Checkbox(label="Duplicate on click", value=False)
+        default_phase_count = 1 + max(0, (STEPS - START_STEP + STEP_INTERVAL - 1) // STEP_INTERVAL)
+        with gr.Row():
+            duplicate_mode = gr.Checkbox(label="Duplicate on click", value=False)
+            first_phase_len = gr.Number(label="First phase length", value=START_STEP, precision=0, step=1)
+            phase_count = gr.Number(label="Number of phases", value=default_phase_count, precision=0, step=1)
+            preset_dropdown = gr.Dropdown(
+                choices=["Custom", "Draft Mode", "Standard Mode", "Long Mode"],
+                value="Custom",
+                label="Presets",
+            )
+
+        def _apply_preset(preset):
+            updates = []
+            if total_iterations is not None:
+                if preset == "Draft Mode":
+                    updates.append(gr.update(value=25))
+                elif preset == "Standard Mode":
+                    updates.append(gr.update(value=50))
+                elif preset == "Long Mode":
+                    updates.append(gr.update(value=50))
+                else:
+                    updates.append(gr.update())
+            if preset == "Draft Mode":
+                updates.append(gr.update(value=15))
+                updates.append(gr.update(value=2))
+            elif preset == "Standard Mode":
+                updates.append(gr.update(value=20))
+                updates.append(gr.update(value=4))
+            elif preset == "Long Mode":
+                updates.append(gr.update(value=35))
+                updates.append(gr.update(value=3))
+            else:
+                updates.append(gr.update())
+                updates.append(gr.update())
+            return tuple(updates)
+
+        preset_outputs = []
+        if total_iterations is not None:
+            preset_outputs.append(total_iterations)
+        preset_outputs.extend([first_phase_len, phase_count])
+        preset_dropdown.change(
+            _apply_preset,
+            inputs=preset_dropdown,
+            outputs=preset_outputs,
+        )
+
         def _update_status_max(value):
             total = STEPS
             if value is not None:
@@ -141,7 +188,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
     )
 
     @torch.no_grad()
-    def _step(prompt: str, negative_prompt: str, state: dict, total_iterations=None):
+    def _step(prompt: str, negative_prompt: str, total_iterations=None, first_phase_len_value=None, phase_count_value=None, state: dict = None):
         log("[PhasePaint_gen] Generate/Continue button clicked")
         device = "cuda" if torch.cuda.is_available() else "cpu"
         pipe = get_pipe()
@@ -173,21 +220,57 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
             )
             latents = latents * pipe.scheduler.init_noise_sigma
 
+            first_phase_len = min(START_STEP, total_steps)
+            if first_phase_len_value is not None:
+                requested_first_phase = max(1, int(first_phase_len_value))
+                if requested_first_phase <= total_steps:
+                    first_phase_len = requested_first_phase
+
+            if phase_count_value is not None:
+                requested_phase_count = max(1, int(phase_count_value))
+            else:
+                requested_phase_count = None
+
+            if requested_phase_count is None:
+                total_phases = 1 + max(0, (total_steps - first_phase_len + STEP_INTERVAL - 1) // STEP_INTERVAL)
+            else:
+                # number_of_phases is lower priority than first_phase_len,
+                # so only adjust the schedule if the requested phase count makes sense.
+                total_phases = requested_phase_count
+
+            if total_phases <= 1 or first_phase_len >= total_steps:
+                first_phase_len = total_steps
+                total_phases = 1
+            else:
+                first_phase_len = min(first_phase_len, total_steps)
+
             latents = pipe(
                 latents=latents,
                 prompt_embeds=prompt_embeds,
                 start_steps_list=[0] * 9,
                 num_inference_steps=[total_steps] * 9,
                 guidance_scale=guidance,
-                phase_len=min(START_STEP, total_steps),
+                phase_len=first_phase_len,
             )
             
             state.update({
                 "latents": latents,
                 "prompt_embeds": prompt_embeds,
-                "current": START_STEP,
-                "guidance": guidance
+                "current": first_phase_len,
+                "guidance": guidance,
+                "phase_len": first_phase_len,
+                "phase_count": total_phases,
             })
+
+            if first_phase_len >= total_steps:
+                final = decode_imgs(latents)
+                state["previews"] = final
+                state.update({"latents": None, "prompt_embeds": None, "current": None, "guidance": None})
+                return final, state, str(first_phase_len), gr.Button(interactive=False), gr.Button(interactive=True)
+
+            previews = preview_imgs(latents)
+            state["previews"] = previews
+            return previews, state, str(first_phase_len), gr.skip(), gr.skip()
 
         # perform one chunk of STEP_INTERVAL steps
         latents = state["latents"]
@@ -257,7 +340,16 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         # run the pipeline from current for another interval; lists size
         # should match the current batch
         n = latents.shape[0]
-        next_phase_len = min(STEP_INTERVAL, max(1, total_steps - current))
+        phase_len = state.get("phase_len", START_STEP)
+        phase_count = state.get("phase_count", 1)
+        remaining_after_first = max(0, total_steps - phase_len)
+        if phase_count <= 1 or remaining_after_first <= 0:
+            next_phase_len = max(1, total_steps - current)
+        else:
+            phases_left = max(1, phase_count - 1)
+            next_phase_len = (remaining_after_first + phases_left - 1) // phases_left
+            next_phase_len = min(next_phase_len, max(1, total_steps - current))
+
         latents = pipe(
             latents=latents,
             prompt_embeds=prompt_embeds,
@@ -284,9 +376,12 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
             return previews, state, str(current), gr.skip(), gr.skip()
 
     inputs = [prompt_txt, neg_txt]
-    inputs.append(state)
     if total_iterations is not None:
         inputs.append(total_iterations)
+    if first_phase_len is not None:
+        inputs.append(first_phase_len)
+        inputs.append(phase_count)
+    inputs.append(state)
 
     go_btn.click(
         _step,
