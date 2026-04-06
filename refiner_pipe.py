@@ -166,7 +166,8 @@ class LatentRefinerPipeline(DiffusionPipeline):
                 #print(timestep_tensor.device)
                 
                 #print(batch_idx_tensor.device)
-                new_latents = self.scheduler.step(batch_noise_preds, int(timestep_tensor[batch_idx_list[0]]), batch_latents).prev_sample
+                #added eta=1.0 for noise reintroduction so identical latents can still have diversity
+                new_latents = self.scheduler.step(batch_noise_preds, int(timestep_tensor[batch_idx_list[0]]), batch_latents, eta=1.0).prev_sample
                 #new_latents = scheduler_output
                 #print("new_latents ",scheduler_output.prev_sample.shape)
                 latents[batch_idx_list] = new_latents
