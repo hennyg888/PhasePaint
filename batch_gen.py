@@ -9,7 +9,7 @@ from logger import log
 import time
 
 
-def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox):
+def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox, total_iterations: gr.components.Number | None = None):
     """Batch-generation interface producing a 3x3 grid of outputs.
 
     The `prompt_txt` and `neg_txt` components are shared across all
@@ -79,12 +79,16 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
 
 
     @torch.no_grad()
-    def _batch(prompt: str, negative_prompt: str, state: dict = None):
+    def _batch(prompt: str, negative_prompt: str, total_iterations=None, state: dict = None):
         #start_time = time.perf_counter()
         log("[batch_gen] generate button clicked")
         device = "cuda" if torch.cuda.is_available() else "cpu"
         pipe = get_pipe()
         guidance = GUIDANCE_SCALE
+
+        steps = STEPS
+        if total_iterations is not None:
+            steps = max(1, int(total_iterations))
 
         # encode prompts once and expand to batch size 9
         prompt_embeds, neg_embeds = pipe.encode_prompt(
@@ -107,7 +111,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         )
         latents = latents * pipe.scheduler.init_noise_sigma
 
-        pipe.scheduler.set_timesteps(STEPS, device=device)
+        pipe.scheduler.set_timesteps(steps, device=device)
         timesteps = pipe.scheduler.timesteps
 
         for t in timesteps:
@@ -125,4 +129,9 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         #print(f"Batch generation completed in {end_time - start_time:.2f} seconds")
         return imgs, state, gr.Button(interactive=False), gr.Button(interactive=True)
 
-    run_btn.click(_batch, inputs=[prompt_txt, neg_txt, state], outputs=[out_gallery, state, run_btn, save_btn])
+    inputs = [prompt_txt, neg_txt]
+    if total_iterations is not None:
+        inputs.append(total_iterations)
+    inputs.append(state)
+
+    run_btn.click(_batch, inputs=inputs, outputs=[out_gallery, state, run_btn, save_btn])

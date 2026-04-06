@@ -43,7 +43,7 @@ def toggle_select(evt: gr.SelectData, state):
     gallery = gr.Gallery(value=gallery_items, selected_index=None)
     return gallery, state
 
-def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox):
+def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox, total_iterations: gr.components.Number | None = None):
     """PhasePaint-specific generation interface.
 
     Uses the same `LatentRefinerPipeline` but runs it repeatedly

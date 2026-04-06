@@ -21,7 +21,7 @@ def get_pipe() -> LatentRefinerPipeline:
     return _GLOBAL_PIPE
 
 
-def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox):
+def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox, total_iterations: gr.components.Number | None = None):
     """Builds the components for the "single gen" tab.
 
     The prompt textboxes are supplied by the caller so they can be
@@ -62,7 +62,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
     from config import STEPS, GUIDANCE_SCALE, PREVIEW_INTERVAL, USER
 
     @torch.no_grad()
-    def _generate(prompt: str, negative_prompt: str):
+    def _generate(prompt: str, negative_prompt: str, total_iterations=None):
         #start_time = time.perf_counter()
         # log generate action
         log("[single_gen] generate button pressed")
@@ -78,6 +78,10 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         device = "cuda" if torch.cuda.is_available() else "cpu"
         pipe = get_pipe()
         guidance = GUIDANCE_SCALE
+
+        steps = STEPS
+        if total_iterations is not None:
+            steps = max(1, int(total_iterations))
 
         # encode prompt(s)
         prompt_embeds, neg_embeds = pipe.encode_prompt(
@@ -97,7 +101,7 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
         latents = latents * pipe.scheduler.init_noise_sigma
 
         # configure scheduler timesteps for full run
-        pipe.scheduler.set_timesteps(STEPS, device=device)
+        pipe.scheduler.set_timesteps(steps, device=device)
         timesteps = pipe.scheduler.timesteps
 
         preview_interval = PREVIEW_INTERVAL
@@ -156,8 +160,12 @@ def create_tab(prompt_txt: gr.components.Textbox, neg_txt: gr.components.Textbox
     save_btn.click(_save_image, outputs=[save_btn, out_img])
 
     # use a queued function so that events run sequentially
+    inputs = [prompt_txt, neg_txt]
+    if total_iterations is not None:
+        inputs.append(total_iterations)
+
     generate_btn.click(
         _generate,
-        inputs=[prompt_txt, neg_txt],
+        inputs=inputs,
         outputs=[out_img, save_btn]
     )

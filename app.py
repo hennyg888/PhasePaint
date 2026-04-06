@@ -10,7 +10,7 @@ from logger import log
 from single_gen import create_tab as single_tab
 from batch_gen import create_tab as batch_tab
 from phasepaint_gen import create_tab as phasepaint_tab
-from config import GALLERY_SIZE, SHARE
+from config import GALLERY_SIZE, SHARE, NEW_FEATS, STEPS
 
 css = f"""
 #my_gallery {{
@@ -35,16 +35,34 @@ def main():
             log(f"negative prompt updated: {txt}")
             return txt
 
+        def _log_iter_change(value: int):
+            log(f"total iterations updated: {value}")
+            return value
+
         prompt_txt.blur(_log_prompt_change, inputs=prompt_txt, outputs=prompt_txt)
         neg_txt.blur(_log_neg_change, inputs=neg_txt, outputs=neg_txt)
 
+        total_iterations = None
+        if NEW_FEATS:
+            total_iterations = gr.Number(
+                label="Total Iterations",
+                value=STEPS,
+                precision=0,
+                step=1,
+            )
+            total_iterations.change(
+                _log_iter_change,
+                inputs=total_iterations,
+                outputs=total_iterations,
+            )
+
         with gr.Tabs():
             with gr.TabItem("single gen"):
-                single_tab(prompt_txt, neg_txt)
+                single_tab(prompt_txt, neg_txt, total_iterations)
             with gr.TabItem("batch gen"):
-                batch_tab(prompt_txt, neg_txt)
+                batch_tab(prompt_txt, neg_txt, total_iterations)
             with gr.TabItem("PhasePaint gen"):
-                phasepaint_tab(prompt_txt, neg_txt)
+                phasepaint_tab(prompt_txt, neg_txt, total_iterations)
 
     demo.launch(share=SHARE)
 
